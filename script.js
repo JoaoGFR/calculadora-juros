@@ -6,7 +6,7 @@ function formatarPorcentagem(valor) {
     return (valor * 100).toFixed(4) + '%';
 }
 function calcularPMT(VP, i, n) {
-    if (n <= 0) return VP; // Se não houver prazo restante, a parcela é o próprio valor
+    if (n <= 0) return VP;
     if (i === 0) return VP / n;
     return VP * (i / (1 - Math.pow((1 + i), -n)));
 }
@@ -19,24 +19,6 @@ function alternarCamposTaxa() {
 }
 alternarCamposTaxa(); // Executa na inicialização
 
-// Função para avançar a data de vencimento
-function proximoVencimento(dataAtual, diaVencimento) {
-    let dia = parseInt(diaVencimento);
-    let novaData = new Date(dataAtual);
-    
-    // Avança para o próximo mês
-    novaData.setMonth(novaData.getMonth() + 1);
-    novaData.setDate(dia);
-   
-    // Tratamento para meses com menos dias (ex: dia 31 em fevereiro)
-    // Se ao setar o dia, o mês mudou, significa que o dia não existe. Voltamos para o último dia do mês correto.
-    if (novaData.getDate() !== dia) {
-        novaData.setDate(0); // Volta para o último dia do mês anterior ao que ele pulou
-    }
-
-    return novaData;
-}
-
 // Função principal de cálculo
 function calcularFinanciamento() {
     // 1. Coletar e validar as entradas
@@ -46,32 +28,50 @@ function calcularFinanciamento() {
     const diaVencimento = parseInt(document.getElementById('diaVencimento').value);
     const tipoJuro = document.getElementById('tipoJuro').value;
     const sistema = document.getElementById('sistemaAmortizacao').value;
-
-    // NOVO: Coleta dos dados de carência
     const carencia = parseInt(document.getElementById('carencia').value);
     const tipoCarencia = document.getElementById('tipoCarencia').value;
+    
+    // NOVO: Coleta do tipo de cálculo de juros
+    const tipoCalculoJuro = document.getElementById('tipoCalculoJuro').value;
 
     if (isNaN(VP) || isNaN(n) || VP <= 0 || n <= 0 || isNaN(dataLiberacao.getTime()) || carencia < 0 || carencia >= n) {
         alert("Por favor, preencha os campos com valores válidos. A carência não pode ser maior ou igual ao prazo total.");
         return;
     }
 
-    let taxaEfetivaMensalBase = 0;
-    let taxaAnualBase = 0;
+    let taxaMensalReferencia = 0; // Taxa usada para o PMT (pode ser efetiva ou nominal)
+    let taxaAnualBase = 0;        // Taxa usada para o cálculo pro-rata (pode ser efetiva ou nominal)
     let indexadorLabel = "";
 
-    // 2. DEFINIÇÃO DA TAXA BASE
-    if (tipoJuro === 'PRE') {
-        taxaAnualBase = parseFloat(document.getElementById('taxaPreAnual').value) / 100;
-        taxaEfetivaMensalBase = Math.pow((1 + taxaAnualBase), (1/12)) - 1;
-        indexadorLabel = "Pré-fixado";
-    } else { // PÓS-FIXADO
-        const indexador = parseFloat(document.getElementById('indexador').value) / 100; // % a.m.
-        const spreadAnual = parseFloat(document.getElementById('spreadAnual').value) / 100;
-        const spreadMensal = Math.pow((1 + spreadAnual), (1/12)) - 1;
-        taxaEfetivaMensalBase = (1 + indexador) * (1 + spreadMensal) - 1; // Juros compostos
-        taxaAnualBase = Math.pow(1 + taxaEfetivaMensalBase, 12) - 1;
-        indexadorLabel = "Pós-fixado";
+    // 2. DEFINIÇÃO DA TAXA BASE (MODIFICADO)
+    if (tipoCalculoJuro === 'composto') {
+        // --- LÓGICA DE JUROS COMPOSTOS (Padrão) ---
+        if (tipoJuro === 'PRE') {
+            taxaAnualBase = parseFloat(document.getElementById('taxaPreAnual').value) / 100;
+            taxaMensalReferencia = Math.pow((1 + taxaAnualBase), (1 / 12)) - 1;
+            indexadorLabel = "Pré-fixado";
+        } else { // PÓS-FIXADO
+            const indexador = parseFloat(document.getElementById('indexador').value) / 100; // a.m.
+            const spreadAnual = parseFloat(document.getElementById('spreadAnual').value) / 100;
+            const spreadMensal = Math.pow((1 + spreadAnual), (1 / 12)) - 1;
+            taxaMensalReferencia = (1 + indexador) * (1 + spreadMensal) - 1; // Soma composta
+            taxaAnualBase = Math.pow(1 + taxaMensalReferencia, 12) - 1;
+            indexadorLabel = "Pós-fixado";
+        }
+    } else {
+        // --- LÓGICA DE JUROS SIMPLES (Nominal) ---
+        if (tipoJuro === 'PRE') {
+            taxaAnualBase = parseFloat(document.getElementById('taxaPreAnual').value) / 100;
+            taxaMensalReferencia = taxaAnualBase / 12; // Divisão simples
+            indexadorLabel = "Pré-fixado";
+        } else { // PÓS-FIXADO
+            const indexador = parseFloat(document.getElementById('indexador').value) / 100; // a.m.
+            const spreadAnual = parseFloat(document.getElementById('spreadAnual').value) / 100;
+            const spreadMensal = spreadAnual / 12;
+            taxaMensalReferencia = indexador + spreadMensal; // Soma simples
+            taxaAnualBase = taxaMensalReferencia * 12;
+            indexadorLabel = "Pós-fixado";
+        }
     }
 
     // 3. VARIÁVEIS DE CONTROLE
@@ -86,11 +86,10 @@ function calcularFinanciamento() {
     let amortizacaoFixaSAC = 0;
     let valorParcelaPrice = 0;
     
-    // 4. CONSTRUÇÃO DA TABELA DE ENDIVIDAMENTO (MÊS A MÊS)
+    // 4. CONSTRUÇÃO DA TABELA
     for (let mes = 1; mes <= n; mes++) {
-        
         let dataVencimentoAtual = new Date(dataLiberacao);
-        dataVencimentoAtual.setMonth(dataVencimentoAtual.getMonth() + mes);
+        dataVencimentoAtual.setMonth(dataLiberacao.getMonth() + mes);
         dataVencimentoAtual.setDate(diaVencimento);
         
         if (dataVencimentoAtual.getDate() !== diaVencimento) {
@@ -99,32 +98,28 @@ function calcularFinanciamento() {
 
         const diasNoPeriodo = Math.round((dataVencimentoAtual - dataVencimentoAnterior) / (1000 * 60 * 60 * 24));
         const fatorJuros = diasNoPeriodo / 360;
-        const taxaProRata = taxaAnualBase * fatorJuros;
-        const juros = saldoDevedor * taxaProRata;
+        const juros = saldoDevedor * taxaAnualBase * fatorJuros; // Cálculo pro-rata usa a taxa anual
         totalJuros += juros;
 
         let amortizacao = 0;
         let valorParcela = 0;
         
-        // MODIFICADO: Lógica para tratar período de carência
         if (mes <= carencia) {
-            amortizacao = 0; // Na carência, não há amortização
+            amortizacao = 0;
             if (tipoCarencia === 'pagar_juros') {
                 valorParcela = juros;
-                // Saldo devedor não muda, pois só paga juros
             } else { // 'capitalizar'
                 valorParcela = 0;
-                saldoDevedor += juros; // Juros são incorporados ao saldo devedor
+                saldoDevedor += juros;
             }
         } else {
-            // Lógica PÓS-CARÊNCIA
-            // Se for o primeiro mês após a carência, (re)calculamos a base de amortização/parcela
             if (mes === carencia + 1) {
                 const prazoRestante = n - carencia;
                 if (sistema === 'SAC') {
                     amortizacaoFixaSAC = saldoDevedor / prazoRestante;
                 } else if (sistema === 'PRICE') {
-                    valorParcelaPrice = calcularPMT(saldoDevedor, taxaEfetivaMensalBase, prazoRestante);
+                    // O PMT é calculado com a taxa mensal de referência (efetiva ou nominal)
+                    valorParcelaPrice = calcularPMT(saldoDevedor, taxaMensalReferencia, prazoRestante);
                 }
             }
             
@@ -137,11 +132,10 @@ function calcularFinanciamento() {
             }
         }
         
-        // Ajustes finais para evitar saldo negativo
         if (saldoDevedor < amortizacao) {
             amortizacao = saldoDevedor;
         }
-        if (mes === n) { // Última parcela, ajusta para zerar o saldo
+        if (mes === n) {
             amortizacao = saldoDevedor;
             valorParcela = juros + amortizacao;
         }
@@ -149,35 +143,35 @@ function calcularFinanciamento() {
         const saldoInicialPeriodo = saldoDevedor;
         saldoDevedor -= amortizacao;
 
-        adicionarLinhaTabela(tabelaBody, mes, formatarData(dataVencimentoAtual), indexadorLabel, taxaAnualBase, diasNoPeriodo, fatorJuros, saldoInicialPeriodo, juros, amortizacao, valorParcela, Math.max(0, saldoDevedor));
+        adicionarLinhaTabela(tabelaBody, mes, formatarData(dataVencimentoAtual), indexadorLabel, taxaMensalReferencia, diasNoPeriodo, fatorJuros, saldoInicialPeriodo, juros, amortizacao, valorParcela, Math.max(0, saldoDevedor));
         
         dataVencimentoAnterior = dataVencimentoAtual;
     }
 
     // 6. ATUALIZAR RESUMO
-    document.getElementById('indexadorAplicado').textContent = indexadorLabel + " (" + formatarPorcentagem(taxaEfetivaMensalBase) + ")";
-    document.getElementById('taxaEfetivaAnual').textContent = formatarPorcentagem(taxaAnualBase);
+    const taxaAnualEfetiva = Math.pow(1 + taxaMensalReferencia, 12) - 1; // Sempre mostramos a efetiva no final
+    document.getElementById('indexadorAplicado').textContent = indexadorLabel + " (" + formatarPorcentagem(taxaMensalReferencia) + ")";
+    document.getElementById('taxaEfetivaAnual').textContent = formatarPorcentagem(taxaAnualEfetiva);
     
-    const primeiraParcela = tabelaBody.rows[1] ? parseFloat(tabelaBody.rows[1].cells[9].textContent.replace('R$', '').replace(/\./g, '').replace(',', '.')) : 0;
+    const primeiraLinha = tabelaBody.rows[1];
+    const primeiraParcela = primeiraLinha ? parseFloat(primeiraLinha.cells[9].textContent.replace('R$', '').replace(/\./g, '').replace(',', '.')) : 0;
     document.getElementById('primeiraParcela').textContent = formatarMoeda(primeiraParcela);
     
     document.getElementById('totalJuros').textContent = formatarMoeda(totalJuros);
 }
 
-// Função auxiliar para formatação de data (DD/MM/AAAA)
+// Funções auxiliares
 function formatarData(data) {
-    // Adiciona o fuso horário para evitar problemas de data "pulando" um dia
     return new Date(data.getTime() + data.getTimezoneOffset() * 60000).toLocaleDateString('pt-BR');
 }
 
-// Função auxiliar para adicionar linha na tabela
-function adicionarLinhaTabela(tabelaBody, mes, dataVenc, indexador, taxaAnual, diasBase360, fatorJuros, saldoInicial, juros, amortizacao, parcela, saldoFinal) {
+function adicionarLinhaTabela(tabelaBody, mes, dataVenc, indexador, taxaMensal, diasBase360, fatorJuros, saldoInicial, juros, amortizacao, parcela, saldoFinal) {
     const tr = tabelaBody.insertRow();
     
     tr.insertCell().textContent = mes === 0 ? 'Liberação' : mes;
     tr.insertCell().textContent = dataVenc;
     tr.insertCell().textContent = mes === 0 ? '' : indexador;
-    tr.insertCell().textContent = mes === 0 ? '' : formatarPorcentagem(Math.pow(1 + taxaAnual, 1/12) - 1);
+    tr.insertCell().textContent = mes === 0 ? '' : formatarPorcentagem(taxaMensal);
     tr.insertCell().textContent = mes === 0 ? '' : diasBase360;
     tr.insertCell().textContent = mes === 0 ? '' : fatorJuros.toFixed(6);
     tr.insertCell().textContent = formatarMoeda(saldoInicial);
@@ -187,8 +181,10 @@ function adicionarLinhaTabela(tabelaBody, mes, dataVenc, indexador, taxaAnual, d
     tr.insertCell().textContent = formatarMoeda(saldoFinal);
 }
 
-// Executar o cálculo ao carregar a página com os valores padrão
+// Executar o cálculo ao carregar a página
 window.onload = function() {
     alternarCamposTaxa();
+    // Adiciona um listener para recalcular sempre que a nova opção for alterada
+    document.getElementById('tipoCalculoJuro').addEventListener('change', calcularFinanciamento);
     calcularFinanciamento();
 };

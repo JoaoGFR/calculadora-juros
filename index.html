@@ -33,6 +33,7 @@
                 <option value="capitalizar">Capitalizar Juros (Sem pagamento)</option>
             </select>
         </div>
+
         <div class="input-group">
             <label for="dataLiberacao">Data de Liberação (Base da Amortização):</label>
             <input type="date" id="dataLiberacao" value="2025-10-15">
@@ -50,7 +51,14 @@
                 <option value="POS">Pós-fixado (Indexador + Spread)</option>
             </select>
         </div>
-
+        
+        <div class="input-group">
+            <label for="tipoCalculoJuro">Tipo de Cálculo de Juros:</label>
+            <select id="tipoCalculoJuro">
+                <option value="composto">Juros Compostos (Padrão de Mercado)</option>
+                <option value="simples">Juros Simples (Nominal)</option>
+            </select>
+        </div>
         <div id="camposPre" class="taxa-campo">
             <div class="input-group">
                 <label for="taxaPreAnual">Taxa Pré-fixada Anual (% a.a.):</label>
@@ -95,7 +103,7 @@
                     <th>Mês</th>
                     <th>Data Vencimento</th>
                     <th>Indexador</th> 
-                    <th>Taxa Mês (Efetiva)</th>
+                    <th>Taxa Mês (Ref.)</th>
                     <th>Dias Base 360</th>
                     <th>Fator de Juros</th>
                     <th>Saldo Inicial</th>
