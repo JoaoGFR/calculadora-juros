@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planilha de Endividamento: Capital de Giro e FINAME</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Simulador de Empréstimos Empresariais (Base 360 dias)</h1>
+
+        <div class="input-group">
+            <label for="valorFinanciado">Valor Liberado (R$):</label>
+            <input type="number" id="valorFinanciado" value="100000" step="0.01">
+        </div>
+
+        <div class="input-group">
+            <label for="prazo">Prazo Total (meses):</label>
+            <input type="number" id="prazo" value="24">
+        </div>
+
+        <div class="input-group">
+            <label for="dataLiberacao">Data de Liberação (Base da Amortização):</label>
+            <input type="date" id="dataLiberacao" value="2025-10-15">
+        </div>
+        
+        <div class="input-group">
+            <label for="diaVencimento">Dia Fixo de Vencimento da Parcela:</label>
+            <input type="number" id="diaVencimento" value="15" min="1" max="31">
+        </div>
+
+        <div class="input-group">
+            <label for="tipoJuro">Modalidade de Juro:</label>
+            <select id="tipoJuro" onchange="alternarCamposTaxa()">
+                <option value="PRE">Pré-fixado (Juro Fixo)</option>
+                <option value="POS">Pós-fixado (Indexador + Spread)</option>
+            </select>
+        </div>
+
+        <div id="camposPre" class="taxa-campo">
+            <div class="input-group">
+                <label for="taxaPreAnual">Taxa Pré-fixada Anual (% a.a.):</label>
+                <input type="number" id="taxaPreAnual" value="15.00" step="0.01">
+            </div>
+        </div>
+
+        <div id="camposPos" class="taxa-campo" style="display:none;">
+            <div class="input-group">
+                <label for="indexador">Indexador (Ex: CDI/TLP) Média Mensal Simulada (% a.m.):</label>
+                <input type="number" id="indexador" value="0.95" step="0.01">
+            </div>
+            <div class="input-group">
+                <label for="spreadAnual">Spread/Juro Real Anual (% a.a.):</label>
+                <input type="number" id="spreadAnual" value="3.00" step="0.01">
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="sistemaAmortizacao">Sistema de Amortização:</label>
+            <select id="sistemaAmortizacao">
+                <option value="SAC">SAC (Parcelas Decrescentes)</option>
+                <option value="PRICE">PRICE (Parcelas Fixas - Cuidado com pós-fixado)</option>
+            </select>
+        </div>
+
+
+        <button onclick="calcularFinanciamento()">Gerar Planilha de Endividamento</button>
+
+        <div class="resultado-box">
+            <h2>Taxas e Resumo (Anual, Base 360 dias)</h2>
+            <p>Indexador Aplicado (Mensal): <span id="indexadorAplicado"></span></p>
+            <p>Taxa Efetiva Anual (Simulada): <span id="taxaEfetivaAnual"></span></p>
+            <p>Valor da 1ª Parcela: <span id="primeiraParcela"></span></p>
+        </div>
+
+        <h2>Planilha de Endividamento Detalhada</h2>
+        <table id="tabelaAmortizacao">
+            <thead>
+                <tr>
+                    <th>Mês</th>
+                    <th>Data Vencimento</th>
+                    <th>Indexador</th> 
+                    <th>Taxa Mês (Efetiva)</th>
+                    <th>Dias Base 360</th>
+                    <th>Fator de Juros</th>
+                    <th>Saldo Inicial</th>
+                    <th>Juros (Composto)</th>
+                    <th>Amortização</th>
+                    <th>Parcela (VEC)</th>
+                    <th>Saldo Final</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
