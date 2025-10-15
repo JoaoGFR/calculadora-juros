@@ -20,7 +20,19 @@
             <label for="prazo">Prazo Total (meses):</label>
             <input type="number" id="prazo" value="24">
         </div>
+        
+        <div class="input-group">
+            <label for="carencia">Período de Carência (meses):</label>
+            <input type="number" id="carencia" value="0" min="0">
+        </div>
 
+        <div class="input-group">
+            <label for="tipoCarencia">Tipo de Carência:</label>
+            <select id="tipoCarencia">
+                <option value="pagar_juros">Pagar Juros na Carência</option>
+                <option value="capitalizar">Capitalizar Juros (Sem pagamento)</option>
+            </select>
+        </div>
         <div class="input-group">
             <label for="dataLiberacao">Data de Liberação (Base da Amortização):</label>
             <input type="date" id="dataLiberacao" value="2025-10-15">
@@ -73,6 +85,7 @@
             <p>Indexador Aplicado (Mensal): <span id="indexadorAplicado"></span></p>
             <p>Taxa Efetiva Anual (Simulada): <span id="taxaEfetivaAnual"></span></p>
             <p>Valor da 1ª Parcela: <span id="primeiraParcela"></span></p>
+            <p>Total de Juros Pagos: <span id="totalJuros"></span></p> 
         </div>
 
         <h2>Planilha de Endividamento Detalhada</h2>
