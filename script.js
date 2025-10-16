@@ -8,6 +8,7 @@ function formatarPorcentagem(valor) {
 function calcularPMT(VP, i, n) {
     if (n <= 0) return VP;
     if (i === 0) return VP / n;
+    // Esta fórmula está matematicamente correta. É equivalente a VP * (i * (1+i)^n) / ((1+i)^n - 1)
     return VP * (i / (1 - Math.pow((1 + i), -n)));
 }
 
@@ -30,8 +31,6 @@ function calcularFinanciamento() {
     const sistema = document.getElementById('sistemaAmortizacao').value;
     const carencia = parseInt(document.getElementById('carencia').value);
     const tipoCarencia = document.getElementById('tipoCarencia').value;
-    
-    // NOVO: Coleta do tipo de cálculo de juros
     const tipoCalculoJuro = document.getElementById('tipoCalculoJuro').value;
 
     if (isNaN(VP) || isNaN(n) || VP <= 0 || n <= 0 || isNaN(dataLiberacao.getTime()) || carencia < 0 || carencia >= n) {
@@ -39,36 +38,34 @@ function calcularFinanciamento() {
         return;
     }
 
-    let taxaMensalReferencia = 0; // Taxa usada para o PMT (pode ser efetiva ou nominal)
-    let taxaAnualBase = 0;        // Taxa usada para o cálculo pro-rata (pode ser efetiva ou nominal)
+    let taxaMensalReferencia = 0;
+    let taxaAnualBase = 0;
     let indexadorLabel = "";
 
-    // 2. DEFINIÇÃO DA TAXA BASE (MODIFICADO)
+    // 2. DEFINIÇÃO DA TAXA BASE
     if (tipoCalculoJuro === 'composto') {
-        // --- LÓGICA DE JUROS COMPOSTOS (Padrão) ---
         if (tipoJuro === 'PRE') {
             taxaAnualBase = parseFloat(document.getElementById('taxaPreAnual').value) / 100;
             taxaMensalReferencia = Math.pow((1 + taxaAnualBase), (1 / 12)) - 1;
             indexadorLabel = "Pré-fixado";
-        } else { // PÓS-FIXADO
-            const indexador = parseFloat(document.getElementById('indexador').value) / 100; // a.m.
+        } else {
+            const indexador = parseFloat(document.getElementById('indexador').value) / 100;
             const spreadAnual = parseFloat(document.getElementById('spreadAnual').value) / 100;
             const spreadMensal = Math.pow((1 + spreadAnual), (1 / 12)) - 1;
-            taxaMensalReferencia = (1 + indexador) * (1 + spreadMensal) - 1; // Soma composta
+            taxaMensalReferencia = (1 + indexador) * (1 + spreadMensal) - 1;
             taxaAnualBase = Math.pow(1 + taxaMensalReferencia, 12) - 1;
             indexadorLabel = "Pós-fixado";
         }
     } else {
-        // --- LÓGICA DE JUROS SIMPLES (Nominal) ---
         if (tipoJuro === 'PRE') {
             taxaAnualBase = parseFloat(document.getElementById('taxaPreAnual').value) / 100;
-            taxaMensalReferencia = taxaAnualBase / 12; // Divisão simples
+            taxaMensalReferencia = taxaAnualBase / 12;
             indexadorLabel = "Pré-fixado";
-        } else { // PÓS-FIXADO
-            const indexador = parseFloat(document.getElementById('indexador').value) / 100; // a.m.
+        } else {
+            const indexador = parseFloat(document.getElementById('indexador').value) / 100;
             const spreadAnual = parseFloat(document.getElementById('spreadAnual').value) / 100;
             const spreadMensal = spreadAnual / 12;
-            taxaMensalReferencia = indexador + spreadMensal; // Soma simples
+            taxaMensalReferencia = indexador + spreadMensal;
             taxaAnualBase = taxaMensalReferencia * 12;
             indexadorLabel = "Pós-fixado";
         }
@@ -81,7 +78,7 @@ function calcularFinanciamento() {
     let totalJuros = 0;
     let dataVencimentoAnterior = dataLiberacao;
     
-    adicionarLinhaTabela(tabelaBody, 0, formatarData(dataLiberacao), indexadorLabel, 0, 0, 0, VP, 0, 0, 0, VP);
+    adicionarLinhaTabela(tabelaBody, 0, formatarData(dataLiberacao), indexadorLabel, 0, 0, 0, saldoDevedor, 0, 0, 0, saldoDevedor);
 
     let amortizacaoFixaSAC = 0;
     let valorParcelaPrice = 0;
@@ -98,7 +95,17 @@ function calcularFinanciamento() {
 
         const diasNoPeriodo = Math.round((dataVencimentoAtual - dataVencimentoAnterior) / (1000 * 60 * 60 * 24));
         const fatorJuros = diasNoPeriodo / 360;
-        const juros = saldoDevedor * taxaAnualBase * fatorJuros; // Cálculo pro-rata usa a taxa anual
+        
+        let juros = 0;
+        
+        // MODIFICADO: Lógica de cálculo de juros separada para PRICE e SAC
+        if (sistema === 'PRICE') {
+            // No sistema PRICE, para a parcela ser fixa, os juros devem ser calculados pela taxa mensal de referência, ignorando a variação de dias.
+            juros = saldoDevedor * taxaMensalReferencia;
+        } else { // Para SAC (e durante a carência), o cálculo pro-rata (dias corridos) é mais comum e aceitável.
+            juros = saldoDevedor * taxaAnualBase * fatorJuros;
+        }
+        
         totalJuros += juros;
 
         let amortizacao = 0;
@@ -110,7 +117,7 @@ function calcularFinanciamento() {
                 valorParcela = juros;
             } else { // 'capitalizar'
                 valorParcela = 0;
-                saldoDevedor += juros;
+                saldoDevedor += juros; // Capitaliza os juros calculados (que para carência, usará pro-rata)
             }
         } else {
             if (mes === carencia + 1) {
@@ -118,7 +125,6 @@ function calcularFinanciamento() {
                 if (sistema === 'SAC') {
                     amortizacaoFixaSAC = saldoDevedor / prazoRestante;
                 } else if (sistema === 'PRICE') {
-                    // O PMT é calculado com a taxa mensal de referência (efetiva ou nominal)
                     valorParcelaPrice = calcularPMT(saldoDevedor, taxaMensalReferencia, prazoRestante);
                 }
             }
@@ -135,7 +141,7 @@ function calcularFinanciamento() {
         if (saldoDevedor < amortizacao) {
             amortizacao = saldoDevedor;
         }
-        if (mes === n) {
+        if (mes === n && saldoDevedor > 0) { // Ajuste para zerar o saldo na última parcela
             amortizacao = saldoDevedor;
             valorParcela = juros + amortizacao;
         }
@@ -149,7 +155,7 @@ function calcularFinanciamento() {
     }
 
     // 6. ATUALIZAR RESUMO
-    const taxaAnualEfetiva = Math.pow(1 + taxaMensalReferencia, 12) - 1; // Sempre mostramos a efetiva no final
+    const taxaAnualEfetiva = (tipoCalculoJuro === 'composto') ? taxaAnualBase : Math.pow(1 + taxaMensalReferencia, 12) - 1;
     document.getElementById('indexadorAplicado').textContent = indexadorLabel + " (" + formatarPorcentagem(taxaMensalReferencia) + ")";
     document.getElementById('taxaEfetivaAnual').textContent = formatarPorcentagem(taxaAnualEfetiva);
     
@@ -184,7 +190,6 @@ function adicionarLinhaTabela(tabelaBody, mes, dataVenc, indexador, taxaMensal, 
 // Executar o cálculo ao carregar a página
 window.onload = function() {
     alternarCamposTaxa();
-    // Adiciona um listener para recalcular sempre que a nova opção for alterada
     document.getElementById('tipoCalculoJuro').addEventListener('change', calcularFinanciamento);
     calcularFinanciamento();
 };
